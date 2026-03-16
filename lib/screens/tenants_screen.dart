@@ -122,13 +122,15 @@ class _TenantsScreenState extends State<TenantsScreen> {
                       String roomName = roomList.isNotEmpty
                           ? roomList.first.roomNumber
                           : tenant.roomId;
+                      String rentPrice = roomList.isNotEmpty
+                          ? 'Rs ${roomList.first.rentAmount.toInt()}'
+                          : 'Rs 0';
 
                       return _buildTenantCard(
                         name: tenant.name,
                         location: '$propertyName • Room $roomName',
                         phone: tenant.phone,
-                        rentAmount:
-                            'Rs 15,000', // Needs property connection later
+                        rentAmount: rentPrice,
                         status: isPending ? 'Pending' : 'Paid',
                         statusColor: isPending
                             ? Colors.redAccent

@@ -92,6 +92,7 @@ class PropertiesScreen extends StatelessWidget {
     final nameController = TextEditingController();
     final addressController = TextEditingController();
     final roomsController = TextEditingController();
+    final rentController = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -169,18 +170,41 @@ class PropertiesScreen extends StatelessWidget {
                 const SizedBox(height: 16),
 
                 // Rooms Input
-                TextField(
-                  controller: roomsController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Number of Rooms',
-                    hintText: 'e.g., 10',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: roomsController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Number of Rooms',
+                          hintText: 'e.g., 10',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                      ),
                     ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                  ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextField(
+                        controller: rentController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Rent per Room',
+                          hintText: 'e.g., 15000',
+                          prefixText: 'Rs ',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 32),
 
@@ -198,12 +222,14 @@ class PropertiesScreen extends StatelessWidget {
                     propertyVM.addProperty(newProperty);
 
                     int numRooms = int.tryParse(roomsController.text) ?? 0;
+                    double rentAmt = double.tryParse(rentController.text) ?? 15000.0;
+                    
                     for (int i = 1; i <= numRooms; i++) {
                       final newRoom = RoomModel(
                         id: '${newProperty.id}_room_$i',
                         propertyId: newProperty.id,
                         roomNumber: i.toString(),
-                        rentAmount: 15000, 
+                        rentAmount: rentAmt, 
                         isOccupied: false,
                       );
                       propertyVM.addRoom(newRoom);
