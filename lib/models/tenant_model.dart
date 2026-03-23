@@ -1,5 +1,6 @@
 class TenantModel {
   final String id;
+  final String userId;
   final String name;
   final String phone;
   final String roomId;
@@ -9,6 +10,7 @@ class TenantModel {
 
   TenantModel({
     required this.id,
+    required this.userId,
     required this.name,
     required this.phone,
     required this.roomId,
@@ -19,6 +21,7 @@ class TenantModel {
 
   Map<String, dynamic> toMap() {
     return {
+      'userId': userId,
       'name': name,
       'phone': phone,
       'roomId': roomId,
@@ -31,6 +34,7 @@ class TenantModel {
   factory TenantModel.fromMap(Map<String, dynamic> map, String id) {
     return TenantModel(
       id: id,
+      userId: map['userId'] ?? '',
       name: map['name'] ?? '',
       phone: map['phone'] ?? '',
       roomId: map['roomId'] ?? '',
@@ -44,6 +48,7 @@ class TenantModel {
 
   TenantModel copyWith({
     String? id,
+    String? userId,
     String? name,
     String? phone,
     String? roomId,
@@ -53,6 +58,7 @@ class TenantModel {
   }) {
     return TenantModel(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       name: name ?? this.name,
       phone: phone ?? this.phone,
       roomId: roomId ?? this.roomId,
@@ -62,3 +68,4 @@ class TenantModel {
     );
   }
 }
+

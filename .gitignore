@@ -43,3 +43,27 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase and Security Secrets
+# Do NOT check these into version control system!
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+.env
+.env.*
+
+# Local/IDE specific
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+android/local.properties
+android/key.properties
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+pubspec_overrides.yaml
+
+# MacOS metadata
+.DS_Store
+
+# Logs
+*.log

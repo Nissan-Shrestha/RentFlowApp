@@ -1,5 +1,6 @@
 class PaymentModel {
   final String id;
+  final String userId;
   final String tenantId;
   final String propertyId;
   final String roomId;
@@ -10,6 +11,7 @@ class PaymentModel {
 
   PaymentModel({
     required this.id,
+    required this.userId,
     required this.tenantId,
     required this.propertyId,
     required this.roomId,
@@ -21,6 +23,7 @@ class PaymentModel {
 
   Map<String, dynamic> toMap() {
     return {
+      'userId': userId,
       'tenantId': tenantId,
       'propertyId': propertyId,
       'roomId': roomId,
@@ -34,6 +37,7 @@ class PaymentModel {
   factory PaymentModel.fromMap(Map<String, dynamic> map, String id) {
     return PaymentModel(
       id: id,
+      userId: map['userId'] ?? '',
       tenantId: map['tenantId'] ?? '',
       propertyId: map['propertyId'] ?? '',
       roomId: map['roomId'] ?? '',
@@ -48,6 +52,7 @@ class PaymentModel {
 
   PaymentModel copyWith({
     String? id,
+    String? userId,
     String? tenantId,
     String? propertyId,
     String? roomId,
@@ -58,6 +63,7 @@ class PaymentModel {
   }) {
     return PaymentModel(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       tenantId: tenantId ?? this.tenantId,
       propertyId: propertyId ?? this.propertyId,
       roomId: roomId ?? this.roomId,
@@ -68,3 +74,4 @@ class PaymentModel {
     );
   }
 }
+

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:rent_flow_app/screens/auth/login_screen.dart';
 import 'package:rent_flow_app/screens/dashboard_screen.dart';
+import 'package:rent_flow_app/screens/profile_screen.dart';
 import 'package:rent_flow_app/screens/properties_screen.dart';
 import 'package:rent_flow_app/screens/reports_screen.dart';
 import 'package:rent_flow_app/screens/tenants_screen.dart';
@@ -14,18 +17,18 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const DashboardScreen(),
-    const PropertiesScreen(),
-    const TenantsScreen(),
-    const ReportsScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final List<Widget> screens = [
+      DashboardScreen(onProfileTap: () => setState(() => _currentIndex = 4)),
+      const PropertiesScreen(),
+      const TenantsScreen(),
+      const ReportsScreen(),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Rent Flow'), centerTitle: true),
-      body: _screens[_currentIndex],
+      body: screens[_currentIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
@@ -53,6 +56,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             icon: Icon(Icons.assessment_outlined),
             selectedIcon: Icon(Icons.assessment),
             label: 'Reports',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
       ),

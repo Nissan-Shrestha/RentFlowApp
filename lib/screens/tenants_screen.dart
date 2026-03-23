@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
+import 'package:rent_flow_app/screens/tenant_details_screen.dart';
 import '../models/tenant_model.dart';
 import '../viewmodels/tenant_viewmodel.dart';
 import '../viewmodels/payment_viewmodel.dart';
@@ -22,14 +26,25 @@ class _TenantsScreenState extends State<TenantsScreen> {
     final propertyVM = context.watch<PropertyViewModel>();
 
     // Filter logic
+    final now = DateTime.now();
     List<TenantModel> displayTenants = tenantVM.tenants;
+    
+    // Status and Filter Logic based on current month's payments
+    bool checkIsPending(TenantModel tenant) {
+      // It is NOT pending if there is a 'Paid' payment for THIS month/year
+      bool hasPaidThisMonth = paymentVM.payments.any((p) =>
+          p.tenantId == tenant.id &&
+          p.status == 'Paid' &&
+          p.date.month == now.month &&
+          p.date.year == now.year);
+      return !hasPaidThisMonth;
+    }
+
     if (_selectedFilter == 'Paid' || _selectedFilter == 'Pending') {
       displayTenants = tenantVM.tenants.where((t) {
-        bool hasPending = paymentVM.payments.any(
-          (p) => p.tenantId == t.id && p.status == 'Pending',
-        );
-        if (_selectedFilter == 'Pending') return hasPending;
-        if (_selectedFilter == 'Paid') return !hasPending;
+        bool isPending = checkIsPending(t);
+        if (_selectedFilter == 'Pending') return isPending;
+        if (_selectedFilter == 'Paid') return !isPending;
         return true;
       }).toList();
     }
@@ -61,22 +76,6 @@ class _TenantsScreenState extends State<TenantsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Column(
               children: [
-                // Top Search Bar
-                TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or room...',
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
                 // Filter Chips
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -104,10 +103,8 @@ class _TenantsScreenState extends State<TenantsScreen> {
                     itemBuilder: (context, index) {
                       final tenant = displayTenants[index];
 
-                      // Mock calculation of tenant status relying on payments
-                      bool isPending = paymentVM.payments.any(
-                        (p) => p.tenantId == tenant.id && p.status == 'Pending',
-                      );
+                      // Status relying on current month's payments
+                      bool isPending = checkIsPending(tenant);
 
                       final propertyList = propertyVM.properties.where(
                         (p) => p.id == tenant.propertyId,
@@ -135,7 +132,39 @@ class _TenantsScreenState extends State<TenantsScreen> {
                         statusColor: isPending
                             ? Colors.redAccent
                             : Colors.green,
-                        daysOverdue: isPending ? 3 : null, // Mock data
+                        daysOverdue: isPending 
+                            ? now.difference(tenant.joinDate.isBefore(DateTime(now.year, now.month, 1)) 
+                                ? DateTime(now.year, now.month, 1) 
+                                : tenant.joinDate).inDays 
+                            : null,
+                        onSendReminder: () async {
+                          final currentMonth = DateFormat('MMMM').format(now);
+                          final message = 'Hi ${tenant.name}, just a friendly reminder that your rent for $currentMonth is currently pending. Please log your payment when you can. Thanks!';
+                          final Uri smsLaunchUri = Uri(
+                            scheme: 'sms',
+                            path: tenant.phone,
+                            queryParameters: <String, String>{
+                              'body': message,
+                            },
+                          );
+                          if (await canLaunchUrl(smsLaunchUri)) {
+                            await launchUrl(smsLaunchUri);
+                          } else {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Could not launch SMS app.'))
+                              );
+                            }
+                          }
+                        },
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TenantDetailsScreen(tenantId: tenant.id),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -346,8 +375,12 @@ class _TenantsScreenState extends State<TenantsScreen> {
                           return;
                         }
 
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user == null) return;
+
                         final newTenant = TenantModel(
                           id: DateTime.now().millisecondsSinceEpoch.toString(),
+                          userId: user.uid,
                           name: nameController.text,
                           phone: phoneController.text,
                           roomId: selectedRoomId!,
@@ -455,6 +488,8 @@ class _TenantsScreenState extends State<TenantsScreen> {
     required String status,
     required Color statusColor,
     int? daysOverdue,
+    VoidCallback? onSendReminder,
+    VoidCallback? onTap,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -473,7 +508,7 @@ class _TenantsScreenState extends State<TenantsScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {},
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -586,7 +621,7 @@ class _TenantsScreenState extends State<TenantsScreen> {
                 ),
 
                 // Contextual Overdue Warning message
-                if (status == 'Pending' && daysOverdue != null) ...[
+                if (status == 'Pending' && (daysOverdue ?? 0) > 0) ...[
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
                     child: Divider(height: 1),
@@ -614,7 +649,7 @@ class _TenantsScreenState extends State<TenantsScreen> {
                       ),
                       // Quick SMS trigger for overdue accounts!
                       TextButton.icon(
-                        onPressed: () {},
+                        onPressed: onSendReminder,
                         icon: const Icon(Icons.sms_outlined, size: 16),
                         label: const Text('Send Reminder'),
                         style: TextButton.styleFrom(

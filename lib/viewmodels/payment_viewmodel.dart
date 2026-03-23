@@ -1,7 +1,13 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/payment_model.dart';
 
 class PaymentViewModel extends ChangeNotifier {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   List<PaymentModel> _payments = [];
 
   List<PaymentModel> get payments => _payments;
@@ -9,55 +15,50 @@ class PaymentViewModel extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
+  StreamSubscription? _paymentsSub;
+
   PaymentViewModel() {
-    _loadMockData();
+    _auth.authStateChanges().listen((user) {
+      if (user != null) {
+        _loadData(user.uid);
+      } else {
+        _clearData();
+      }
+    });
   }
 
-  void _loadMockData() {
+  void _loadData(String userId) {
     _isLoading = true;
     notifyListeners();
 
-    // Mock initial data
-    _payments = [
-      PaymentModel(
-        id: 'pay1',
-        tenantId: 't1',
-        propertyId: 'p1',
-        roomId: 'r1',
-        amount: 15000,
-        date: DateTime.now().subtract(const Duration(days: 2)),
-        method: 'Cash',
-        status: 'Paid',
-      ),
-      PaymentModel(
-        id: 'pay2',
-        tenantId: 't2',
-        propertyId: 'p1',
-        roomId: 'r2',
-        amount: 12000,
-        date: DateTime.now(),
-        method: 'Online',
-        status: 'Pending',
-      ),
-      PaymentModel(
-        id: 'pay3',
-        tenantId: 't3',
-        propertyId: 'p2',
-        roomId: 'r4',
-        amount: 20000,
-        date: DateTime.now().subtract(const Duration(days: 1)),
-        method: 'Bank Transfer',
-        status: 'Paid',
-      ),
-    ];
+    _paymentsSub?.cancel();
+    _paymentsSub = _firestore
+        .collection('payments')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .listen((snapshot) {
+      _payments = snapshot.docs.map((doc) => PaymentModel.fromMap(doc.data(), doc.id)).toList();
+      notifyListeners();
+    });
 
     _isLoading = false;
     notifyListeners();
   }
 
-  void addPayment(PaymentModel payment) {
-    _payments.add(payment);
+  void _clearData() {
+    _paymentsSub?.cancel();
+    _payments = [];
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _paymentsSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> addPayment(PaymentModel payment) async {
+    await _firestore.collection('payments').doc(payment.id).set(payment.toMap());
   }
 
   double getTotalCollected() {
@@ -72,3 +73,4 @@ class PaymentViewModel extends ChangeNotifier {
         .fold(0, (sum, item) => sum + item.amount);
   }
 }
+

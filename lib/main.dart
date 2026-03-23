@@ -4,11 +4,21 @@ import 'package:rent_flow_app/screens/auth/splash_screen.dart';
 import 'package:rent_flow_app/viewmodels/property_viewmodel.dart';
 import 'package:rent_flow_app/viewmodels/tenant_viewmodel.dart';
 import 'package:rent_flow_app/viewmodels/payment_viewmodel.dart';
+import 'package:rent_flow_app/viewmodels/auth_viewmodel.dart';
 
-void main() {
+import 'package:firebase_core/firebase_core.dart';
+import 'package:rent_flow_app/firebase_options.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AuthViewModel()),
         ChangeNotifierProvider(create: (_) => PropertyViewModel()),
         ChangeNotifierProvider(create: (_) => TenantViewModel()),
         ChangeNotifierProvider(create: (_) => PaymentViewModel()),

@@ -1,22 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/payment_model.dart';
 import '../viewmodels/payment_viewmodel.dart';
 import '../viewmodels/tenant_viewmodel.dart';
+import '../viewmodels/property_viewmodel.dart';
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  final VoidCallback onProfileTap;
+  const DashboardScreen({super.key, required this.onProfileTap});
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final userInitial = user?.email?.substring(0, 1).toUpperCase() ?? 'U';
+    
     final paymentViewModel = context.watch<PaymentViewModel>();
     final tenantViewModel = context.watch<TenantViewModel>();
+    final propertyViewModel = context.watch<PropertyViewModel>();
 
     final double totalCollected = paymentViewModel.getTotalCollected();
-    final double totalPending = paymentViewModel.getTotalPending();
-    final double totalExpected = totalCollected + totalPending;
+    
+    // Calculate total expected only from rooms that are currently occupied
+    final double totalExpected = propertyViewModel.rooms
+        .where((r) => r.isOccupied)
+        .fold(0.0, (sum, room) => sum + room.rentAmount);
+
+    final double totalPending = totalExpected - totalCollected;
+
     final double progress = totalExpected > 0
-        ? totalCollected / totalExpected
+        ? (totalCollected / totalExpected).clamp(0.0, 1.0)
         : 0.0;
 
     // Sorting mock recent payments (latest first)
@@ -57,10 +70,19 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const CircleAvatar(
-                    backgroundColor: Color(0xFF1E3A8A),
-                    radius: 20,
-                    child: Icon(Icons.person, color: Colors.white),
+                  GestureDetector(
+                    onTap: onProfileTap,
+                    child: CircleAvatar(
+                      backgroundColor: const Color(0xFF1E3A8A),
+                      radius: 20,
+                      child: Text(
+                        userInitial,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -182,7 +204,8 @@ class DashboardScreen extends StatelessWidget {
       // Floating Action Button for Logging Payment
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          _showLogPaymentSheet(context, tenantViewModel, paymentViewModel);
+          final propertyViewModel = context.read<PropertyViewModel>();
+          _showLogPaymentSheet(context, tenantViewModel, paymentViewModel, propertyViewModel);
         },
         backgroundColor: const Color(0xFF1E3A8A),
         icon: const Icon(Icons.add, color: Colors.white),
@@ -205,6 +228,7 @@ class DashboardScreen extends StatelessWidget {
     BuildContext context,
     TenantViewModel tenantVM,
     PaymentViewModel paymentVM,
+    PropertyViewModel propertyVM,
   ) {
     String selectedMethod = 'Cash';
     String? selectedTenantId;
@@ -258,26 +282,29 @@ class DashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 32),
 
-                    // Amount Input
-                    TextField(
-                      controller: amountController,
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E3A8A),
-                      ),
-                      textAlign: TextAlign.center,
-                      decoration: InputDecoration(
-                        hintText: '0',
-                        prefixText: 'Rs ',
-                        prefixStyle: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E3A8A),
-                        ),
-                        border: InputBorder.none,
-                        hintStyle: TextStyle(color: Colors.grey[300]),
+                    // Amount Display (Calculated - No Partial)
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Column(
+                        children: [
+                          Text(
+                            amountController.text.isEmpty ? '0' : 'Rs ${amountController.text}',
+                            style: const TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E3A8A),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Exact Monthly Rent',
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const Divider(),
@@ -299,7 +326,15 @@ class DashboardScreen extends StatelessWidget {
                           hint: const Text('Select Tenant'),
                           value: selectedTenantId,
                           icon: const Icon(Icons.arrow_drop_down),
-                          items: tenantVM.tenants.map((tenant) {
+                          items: tenantVM.tenants.where((tenant) {
+                            // Only show tenants that have NOT paid for the current month
+                            final now = DateTime.now();
+                            return !paymentVM.payments.any((p) =>
+                                p.tenantId == tenant.id &&
+                                p.status == 'Paid' &&
+                                p.date.month == now.month &&
+                                p.date.year == now.year);
+                          }).map((tenant) {
                             return DropdownMenuItem<String>(
                               value: tenant.id,
                               child: Text(tenant.name),
@@ -308,6 +343,15 @@ class DashboardScreen extends StatelessWidget {
                           onChanged: (newValue) {
                             setModalState(() {
                               selectedTenantId = newValue;
+                              if (selectedTenantId != null) {
+                                final tenant = tenantVM.getTenantById(selectedTenantId!);
+                                if (tenant != null) {
+                                  final room = propertyVM.rooms.where((r) => r.id == tenant.roomId).firstOrNull;
+                                  if (room != null) {
+                                    amountController.text = room.rentAmount.toInt().toString();
+                                  }
+                                }
+                              }
                             });
                           },
                         ),
@@ -404,13 +448,19 @@ class DashboardScreen extends StatelessWidget {
                           return;
                         }
 
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user == null) return;
+
+                        final tenant = tenantVM.getTenantById(selectedTenantId!);
+                        if (tenant == null) return;
+
                         // Dynamically creating a real payment model
                         final newPayment = PaymentModel(
-                          id: DateTime.now().millisecondsSinceEpoch
-                              .toString(), // mock id
+                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                          userId: user.uid,
                           tenantId: selectedTenantId!,
-                          propertyId: 'p1', // mock relation
-                          roomId: 'r1', // mock relation
+                          propertyId: tenant.propertyId,
+                          roomId: tenant.roomId,
                           amount: double.tryParse(amountController.text) ?? 0,
                           date: DateTime.now(),
                           method: selectedMethod,

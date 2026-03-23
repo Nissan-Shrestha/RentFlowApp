@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../viewmodels/property_viewmodel.dart';
+import '../viewmodels/payment_viewmodel.dart';
+import '../viewmodels/tenant_viewmodel.dart';
+import '../services/pdf_service.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -8,14 +13,18 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  String _selectedRange = 'Monthly';
+  String _selectedRange = 'This Month';
 
   @override
   Widget build(BuildContext context) {
+    final propertyVM = context.watch<PropertyViewModel>();
+    final paymentVM = context.watch<PaymentViewModel>();
+    final tenantVM = context.watch<TenantViewModel>();
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Reports & Export', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Reports', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF0F172A),
         elevation: 0,
@@ -33,7 +42,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
           const SizedBox(height: 12),
           
-          // Date Range Dropdown / Selector
+          // Date Range Dropdown
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             decoration: BoxDecoration(
@@ -46,7 +55,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 value: _selectedRange,
                 isExpanded: true,
                 icon: const Icon(Icons.calendar_today, size: 20),
-                items: <String>['Weekly', 'Monthly', 'Quarterly', 'Yearly']
+                items: <String>['This Month', 'Last 6 Months', 'Last 1 Year']
                     .map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
@@ -64,7 +73,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           const SizedBox(height: 32),
 
           const Text(
-            'Generate PDF Reports',
+            'PDF Reports',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -73,26 +82,35 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Report Option Cards
-          _buildReportOption(
-            title: 'House-wise Collection Summary',
-            description: 'Breakdown of rent collected vs pending for each property.',
-            icon: Icons.home_work_outlined,
-          ),
+          // Simplified Report Option Card
           _buildReportOption(
             title: 'Tenant Payment History',
-            description: 'Complete transaction history for all individual tenants.',
+            description: 'Download the complete list of payments for all tenants.',
             icon: Icons.people_outline,
-          ),
-          _buildReportOption(
-            title: 'Outstanding Dues Report',
-            description: 'A dedicated list of all unpaid rent and overdue amounts.',
-            icon: Icons.warning_amber_rounded,
-          ),
-          _buildReportOption(
-            title: 'Complete Financial Statement',
-            description: 'A master document covering every property and payment.',
-            icon: Icons.account_balance_wallet_outlined,
+            onTap: () {
+              final now = DateTime.now();
+              final filteredPayments = paymentVM.payments.where((p) {
+                if (_selectedRange == 'This Month') {
+                  return p.date.month == now.month && p.date.year == now.year;
+                } else if (_selectedRange == 'Last 6 Months') {
+                  final sixMonthsAgo = now.subtract(const Duration(days: 180));
+                  return p.date.isAfter(sixMonthsAgo);
+                } else if (_selectedRange == 'Last 1 Year') {
+                  final oneYearAgo = now.subtract(const Duration(days: 365));
+                  return p.date.isAfter(oneYearAgo);
+                }
+                return true;
+              }).toList()
+                ..sort((a, b) => b.date.compareTo(a.date));
+
+              PdfService.generateTenantReport(
+                payments: filteredPayments,
+                rooms: propertyVM.rooms,
+                tenants: tenantVM.tenants,
+                properties: propertyVM.properties,
+                range: _selectedRange,
+              );
+            },
           ),
         ],
       ),
@@ -103,6 +121,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     required String title,
     required String description,
     required IconData icon,
+    VoidCallback? onTap,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -111,7 +130,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -121,9 +140,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            // TODO: Trigger PDF generation and share sheet
-          },
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
