@@ -2,6 +2,25 @@
 
 Rent Flow is a professional property management application designed for landlords to streamline rental operations. It provides a centralized platform for tracking properties, managing tenants, and logging payments with real-time Firebase synchronization.
 
+## Visual Overview
+
+<div align="center">
+  <h4>Core Navigation</h4>
+  <img src="assets/screenshots/dashboard.png" width="210" alt="Dashboard" />
+  <img src="assets/screenshots/properties.png" width="210" alt="Properties" />
+  <img src="assets/screenshots/tenants.png" width="210" alt="Tenants" />
+  <img src="assets/screenshots/reports.png" width="210" alt="Reports" />
+  
+  <h4>Detailed Management</h4>
+  <img src="assets/screenshots/property_details.png" width="210" alt="Property Details" />
+  <img src="assets/screenshots/tenant_details.png" width="210" alt="Tenant Details" />
+  
+  <h4>Account & Security</h4>
+  <img src="assets/screenshots/profile.png" width="210" alt="Profile" />
+  <img src="assets/screenshots/login.png" width="210" alt="Login" />
+  <img src="assets/screenshots/register.png" width="210" alt="Register" />
+</div>
+
 ## Core Features
 
 ### Management Dashboard
